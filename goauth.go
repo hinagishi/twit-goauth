@@ -89,10 +89,10 @@ func GetToken(url string, query string) string {
 	req.URL.RawQuery = query
 	req.Header.Add("Authorize", "Oauth")
 	client := new(http.Client)
-	resp, err = client.Do(req)
+	resp, err := client.Do(req)
 	defer resp.Body.Close()
 
-	buf, err = ioutil.ReadAll(resp.Body)
+	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to read.")
 		os.Exit(1)
@@ -161,6 +161,6 @@ func main() {
 
 	request = param2 + "oauth_signature=" + encsignature
 
-	resutl = GetToken(endpoint, request)
+	result = GetToken(endpoint, request)
 	fmt.Println(result)
 }

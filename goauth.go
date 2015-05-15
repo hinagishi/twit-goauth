@@ -1,74 +1,85 @@
 package main
 
 import (
-	"fmt"
-	"crypto/rand"
-	"crypto/hmac"
-	"crypto/sha1"
-	"math/big"
-	"strconv"
-	"time"
 	"bufio"
-	"os"
-	"strings"
-	"net/url"
-	"net/http"
-	"io/ioutil"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha1"
 	"encoding/base64"
+	"fmt"
+	"io/ioutil"
+	"math/big"
+	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type Config struct {
-	ConsumerKey string
-	ConsumerSecret string
-	Nonce string
-	Method string
+	Nonce     string
+	Method    string
 	Timestamp string
-	Token string
-	Verifier string
-	Version string
+	Verifier  string
+	Version   string
+	Pin       string
 }
 
 type Token struct {
-	Token string
+	Token  string
 	Secret string
 }
 
+const (
+	request_token_url = "https://api.twitter.com/oauth/request_token"
+	access_token_url  = "https://api.twitter.com/oauth/access_token"
+	authorize_url     = "http://twitter.com/oauth/authorize?oauth_token="
+)
 
-func (conf *Config) Init() {
-	conf.Method = "HMAC-SHA1"
-	conf.Version = "1.0"
-	conf.random(32)
-	conf.Timestamp = strconv.FormatInt(time.Now().Unix(), 10)
-}
-
-func (conf *Config) inputKeys() {
-	fp, err := os.Open("keys")
+/*
+ * read consumer and access tokens from file
+ * @param filename
+ * @return ConsumerKeys and AccessTokens
+ */
+func ReadTokens(file string) (*Token, *Token, error) {
+	fp, err := os.Open(file)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to open keys file.")
-		os.Exit(1)
+		return nil, nil, err
 	}
 	defer fp.Close()
 
+	consumer := new(Token)
+	access := new(Token)
 	scanner := bufio.NewScanner(fp)
 	for scanner.Scan() {
 		key := strings.Split(scanner.Text(), ":")
 		if len(key) < 2 {
-			fmt.Fprintln(os.Stderr, "Invalid file format.")
-			os.Exit(1)
+			continue
 		}
 		if key[0] == "consumer_key" {
-			conf.ConsumerKey = key[1]
+			consumer.Token = key[1]
 		} else if key[0] == "consumer_secret" {
-			conf.ConsumerSecret = key[1]
+			consumer.Secret = key[1]
+		} else if key[0] == "access_token" {
+			access.Token = key[1]
+		} else if key[0] == "access_secret" {
+			access.Secret = key[1]
 		}
 	}
 	err = scanner.Err()
 	if err != nil {
-		os.Exit(1)
+		return nil, nil, err
 	}
+
+	if consumer.Token == "" || consumer.Secret == "" {
+		fmt.Fprintln(os.Stderr, "Invalid file format.")
+		return nil, nil, err
+	}
+	return consumer, access, err
 }
 
-func (conf *Config) random(length int) {
+func random(length int) string {
 	const base = 36
 	size := big.NewInt(base)
 	n := make([]byte, length)
@@ -76,15 +87,17 @@ func (conf *Config) random(length int) {
 		c, _ := rand.Int(rand.Reader, size)
 		n[i] = strconv.FormatInt(c.Int64(), base)[0]
 	}
-	conf.Nonce = string(n)
-	conf.inputKeys()
+	return string(n)
 }
 
-func GetToken(url string, query string) string {
-	req, err := http.NewRequest("GET", url, nil)
+func getTimestamp() string {
+	return strconv.FormatInt(time.Now().Unix(), 10)
+}
+
+func GetToken(method string, url string, query string) (string, error) {
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to request")
-		os.Exit(1)
+		return "", err
 	}
 	req.URL.RawQuery = query
 	req.Header.Add("Authorize", "Oauth")
@@ -92,75 +105,99 @@ func GetToken(url string, query string) string {
 	resp, err := client.Do(req)
 	defer resp.Body.Close()
 
+	if resp.StatusCode != 200 {
+		return "", err
+	}
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to read.")
-		os.Exit(1)
+		return "", err
 	}
-	return string(buf)
+	return string(buf), nil
 }
 
-func main() {
-	endpoint := "https://api.twitter.com/oauth/request_token"
-	var conf Config
-	conf.Init()
-	param1 := "GET&" + url.QueryEscape(endpoint) + "&"
-	param2 := "oauth_consumer_key=" + conf.ConsumerKey + "&"
-	param2 += "oauth_nonce=" + conf.Nonce + "&"
-	param2 += "oauth_signature_method=" + conf.Method + "&"
-	param2 += "oauth_timestamp=" + conf.Timestamp + "&"
-	param2 += "oauth_version=" + conf.Version
-	param3 := url.QueryEscape(conf.ConsumerSecret) + "&"
-
+func getRequestToken(consumer *Token) (*Token, error) {
+	param1 := "GET&" + url.QueryEscape(request_token_url) + "&"
+	param2 := "oauth_consumer_key=" + consumer.Token + "&"
+	param2 += "oauth_nonce=" + random(32) + "&"
+	param2 += "oauth_signature_method=HMAC-SHA1&"
+	param2 += "oauth_timestamp=" + getTimestamp() + "&"
+	param2 += "oauth_version=1.0"
+	param3 := url.QueryEscape(consumer.Secret) + "&"
 	param1 += url.QueryEscape(param2)
-	fmt.Println(param1)
 
 	hash := hmac.New(sha1.New, []byte(param3))
 	hash.Write([]byte(param1))
-	signature := base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	encsignature := url.QueryEscape(signature)
+	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(hash.Sum(nil)))
+	query := param2 + "&oauth_signature=" + sig
+	result, err := GetToken("GET", request_token_url, query)
 
-	request := param2 + "&oauth_signature=" + encsignature
-	fmt.Println(request)
-
-	result := GetToken(endpoint, request)
-	fmt.Println(result)
-
-	tokens := strings.Split(result, "&")
-	token := Token{
-		strings.Split(tokens[0], "=")[1],
-		strings.Split(tokens[1], "=")[1],
+	if err != nil {
+		return nil, err
 	}
-	fmt.Println(token)
+	reqToken := new(Token)
+	reqToken.Token = strings.Split(strings.Split(result, "&")[0], "=")[1]
+	reqToken.Secret = strings.Split(strings.Split(result, "&")[1], "=")[1]
+	return reqToken, nil
+}
 
-	pinurl := "http://twitter.com/oauth/authorize?oauth_token=" + token.Token
-
+func getPinCode(reqtoken *Token) string {
+	pinurl := authorize_url + reqtoken.Token
 	fmt.Println(pinurl)
 
-	fmt.Print("Input PIN: ")
+	fmt.Print("Input PIN code:")
 	var pin string
 	fmt.Scan(&pin)
-	fmt.Println(pin)
+	return pin
+}
 
-	endpoint = "https://api.twitter.com/oauth/access_token"
-	param1 = "GET&" + url.QueryEscape(endpoint) + "&"
-	param2 = "oauth_consumer_key=" + conf.ConsumerKey + "&"
-	param2 += "oauth_nonce=" + conf.Nonce + "&"
-	param2 += "oauth_signature_method=" + conf.Method + "&"
-	param2 += "oauth_timestamp=" + conf.Timestamp + "&"
-	param2 += "oauth_token=" + token.Token + "&"
+func GetAccessToken(consumer *Token, access *Token) error {
+	reqtoken, err := getRequestToken(consumer)
+	if err != nil {
+		return err
+	}
+	pin := getPinCode(reqtoken)
+
+	param1 := "GET&" + url.QueryEscape(access_token_url) + "&"
+	param2 := "oauth_consumer_key=" + consumer.Token + "&"
+	param2 += "oauth_nonce=" + random(32) + "&"
+	param2 += "oauth_signature_method=HMAC-SHA1&"
+	param2 += "oauth_timestamp=" + getTimestamp() + "&"
+	param2 += "oauth_token=" + reqtoken.Token + "&"
 	param2 += "oauth_verifier=" + pin + "&"
-	param2 += "oauth_version=" + conf.Version
-	param3 = url.QueryEscape(conf.ConsumerSecret) + "&" + url.QueryEscape(token.Secret)
-
+	param2 += "oauth_version=1.0"
+	param3 := url.QueryEscape(consumer.Secret) + "&"
+	param3 += url.QueryEscape(reqtoken.Secret)
 	param1 += url.QueryEscape(param2)
-	hash = hmac.New(sha1.New, []byte(param3))
+
+	hash := hmac.New(sha1.New, []byte(param3))
 	hash.Write([]byte(param1))
-	signature = base64.StdEncoding.EncodeToString(hash.Sum(nil))
-	encsignature = url.QueryEscape(signature)
-
-	request = param2 + "oauth_signature=" + encsignature
-
-	result = GetToken(endpoint, request)
+	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(hash.Sum(nil)))
+	query := param2 + "&oauth_signature=" + sig
+	result, err := GetToken("GET", access_token_url, query)
+	if err != nil {
+		return err
+	}
 	fmt.Println(result)
+	return nil
+}
+
+func SaveTokens(consumer *Token, access *Token) error {
+
+	return nil
+}
+
+func main() {
+	consumer, access, err := ReadTokens("keys")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to initialize tokens.")
+		os.Exit(1)
+	}
+
+	if access.Token == "" || access.Secret == "" {
+		err := GetAccessToken(consumer, access)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to get access token.")
+			os.Exit(1)
+		}
+	}
 }

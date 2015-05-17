@@ -10,11 +10,11 @@ Work in progress
 ### ReadToken(file string) (\*Token, \*Token, error)
 Read consumer key, secret and access token, secret from file.
 
-### GetRequestToken(consumer \*Token) (\*Token, error)
-Get request token, secret and return them.
-
 ### GetAccessToken(consumer \*Token, access \*Token) error
 Get access token, secret and stores them into access \*Token
+
+### GetRequestToken(consumer \*Token) (\*Token, error)
+Get request token, secret and return them.
 
 ### GetPinUrl(requtoken \*Token) string
 Create a url to retrieve PIN code.

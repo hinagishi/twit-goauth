@@ -135,12 +135,7 @@ func GetPinUrl(reqtoken *Token) string {
 	return authorize_url + reqtoken.Token
 }
 
-func GetAccessToken(consumer *Token, access *Token) error {
-	reqtoken, err := getRequestToken(consumer)
-	if err != nil {
-		return err
-	}
-	pin := getPinCode(reqtoken)
+func GetAccessToken(consumer *Token, reqtoken *Token, pin string) (*Token, error) {
 
 	param1 := "GET&" + url.QueryEscape(access_token_url) + "&"
 	param2 := "oauth_consumer_key=" + consumer.Token + "&"
@@ -160,10 +155,12 @@ func GetAccessToken(consumer *Token, access *Token) error {
 	query := param2 + "&oauth_signature=" + sig
 	result, err := getToken("GET", access_token_url, query)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Println(result)
-	return nil
+	access := new(Token)
+	access.Token = strings.Split(strings.Split(result, "&")[0], "=")[1]
+	access.Secret = strings.Split(strings.Split(result, "&")[1], "=")[1]
+	return access, nil
 }
 
 func SaveTokens(filename string, consumer *Token, access *Token) {

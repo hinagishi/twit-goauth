@@ -1,4 +1,4 @@
-package main
+package twitgoauth
 
 import (
 	"bufio"
@@ -16,15 +16,6 @@ import (
 	"strings"
 	"time"
 )
-
-type Config struct {
-	Nonce     string
-	Method    string
-	Timestamp string
-	Verifier  string
-	Version   string
-	Pin       string
-}
 
 type Token struct {
 	Token  string
@@ -181,23 +172,11 @@ func GetAccessToken(consumer *Token, access *Token) error {
 	return nil
 }
 
-func SaveTokens(consumer *Token, access *Token) error {
-
-	return nil
+func SaveTokens(filename string, consumer *Token, access *Token) {
+	output := "consumer_key:" + consumer.Token
+	output += "\nconsumer_secret:" + consumer.Secret
+	output += "\naccess_token:" + access.Token
+	output += "\naccess_secret:" + access.Secret
+	ioutil.WriteFile(filename, []byte(output), os.ModePerm)
 }
 
-func main() {
-	consumer, access, err := ReadTokens("keys")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to initialize tokens.")
-		os.Exit(1)
-	}
-
-	if access.Token == "" || access.Secret == "" {
-		err := GetAccessToken(consumer, access)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to get access token.")
-			os.Exit(1)
-		}
-	}
-}

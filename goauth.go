@@ -131,14 +131,8 @@ func getRequestToken(consumer *Token) (*Token, error) {
 	return reqToken, nil
 }
 
-func getPinCode(reqtoken *Token) string {
-	pinurl := authorize_url + reqtoken.Token
-	fmt.Println(pinurl)
-
-	fmt.Print("Input PIN code:")
-	var pin string
-	fmt.Scan(&pin)
-	return pin
+func GetPinUrl(reqtoken *Token) string {
+	return authorize_url + reqtoken.Token
 }
 
 func GetAccessToken(consumer *Token, access *Token) error {

@@ -85,7 +85,7 @@ func getTimestamp() string {
 	return strconv.FormatInt(time.Now().Unix(), 10)
 }
 
-func GetToken(method string, url string, query string) (string, error) {
+func getToken(method string, url string, query string) (string, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return "", err
@@ -106,7 +106,7 @@ func GetToken(method string, url string, query string) (string, error) {
 	return string(buf), nil
 }
 
-func getRequestToken(consumer *Token) (*Token, error) {
+func GetRequestToken(consumer *Token) (*Token, error) {
 	param1 := "GET&" + url.QueryEscape(request_token_url) + "&"
 	param2 := "oauth_consumer_key=" + consumer.Token + "&"
 	param2 += "oauth_nonce=" + random(32) + "&"
@@ -120,7 +120,7 @@ func getRequestToken(consumer *Token) (*Token, error) {
 	hash.Write([]byte(param1))
 	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(hash.Sum(nil)))
 	query := param2 + "&oauth_signature=" + sig
-	result, err := GetToken("GET", request_token_url, query)
+	result, err := getToken("GET", request_token_url, query)
 
 	if err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ func GetAccessToken(consumer *Token, access *Token) error {
 	hash.Write([]byte(param1))
 	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(hash.Sum(nil)))
 	query := param2 + "&oauth_signature=" + sig
-	result, err := GetToken("GET", access_token_url, query)
+	result, err := getToken("GET", access_token_url, query)
 	if err != nil {
 		return err
 	}
@@ -173,4 +173,5 @@ func SaveTokens(filename string, consumer *Token, access *Token) {
 	output += "\naccess_secret:" + access.Secret
 	ioutil.WriteFile(filename, []byte(output), os.ModePerm)
 }
+
 

@@ -171,4 +171,3 @@ func SaveTokens(filename string, consumer *Token, access *Token) {
 	ioutil.WriteFile(filename, []byte(output), os.ModePerm)
 }
 
-

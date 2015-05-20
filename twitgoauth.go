@@ -34,6 +34,7 @@ const (
  * @return ConsumerKeys and AccessTokens
  */
 func ReadTokens(file string) (*Token, *Token, error) {
+	fmt.Fprintln(os.Stderr, file)
 	fp, err := os.Open(file)
 	if err != nil {
 		return nil, nil, err
@@ -48,14 +49,14 @@ func ReadTokens(file string) (*Token, *Token, error) {
 		if len(key) < 2 {
 			continue
 		}
-		if key[0] == "consumer_key" {
-			consumer.Token = key[1]
-		} else if key[0] == "consumer_secret" {
-			consumer.Secret = key[1]
-		} else if key[0] == "access_token" {
-			access.Token = key[1]
-		} else if key[0] == "access_secret" {
-			access.Secret = key[1]
+		if strings.Trim(strings.Trim(key[0], " "), " ") == "consumer_key" {
+			consumer.Token = strings.Trim(key[1], " ")
+		} else if strings.Trim(key[0], " ") == "consumer_secret" {
+			consumer.Secret = strings.Trim(key[1], " ")
+		} else if strings.Trim(key[0], " ") == "access_token" {
+			access.Token = strings.Trim(key[1], " ")
+		} else if strings.Trim(key[0], " ") == "access_secret" {
+			access.Secret = strings.Trim(key[1], " ")
 		}
 	}
 	err = scanner.Err()
@@ -86,6 +87,7 @@ func getTimestamp() string {
 }
 
 func getToken(method string, url string, query string) (string, error) {
+	fmt.Fprintln(os.Stderr, query)
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return "", err
@@ -107,6 +109,7 @@ func getToken(method string, url string, query string) (string, error) {
 }
 
 func GetRequestToken(consumer *Token) (*Token, error) {
+	fmt.Fprintln(os.Stderr, consumer)
 	param1 := "GET&" + url.QueryEscape(request_token_url) + "&"
 	param2 := "oauth_consumer_key=" + consumer.Token + "&"
 	param2 += "oauth_nonce=" + random(32) + "&"
@@ -122,6 +125,7 @@ func GetRequestToken(consumer *Token) (*Token, error) {
 	query := param2 + "&oauth_signature=" + sig
 	result, err := getToken("GET", request_token_url, query)
 
+	fmt.Println(result)
 	if err != nil {
 		return nil, err
 	}

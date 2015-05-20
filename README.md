@@ -10,7 +10,7 @@ Work in progress
 ### ReadToken(file string) (\*Token, \*Token, error)
 Read consumer key, secret and access token, secret from file.
 
-### GetAccessToken(consumer \*Token, access \*Token, pin string) error
+### GetAccessToken(consumer \*Token, access \*Token, pin string) (\*Token, error)
 Get access token, secret and stores them into access \*Token
 
 ### GetRequestToken(consumer \*Token) (\*Token, error)

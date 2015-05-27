@@ -113,7 +113,7 @@ func getToken(method string, url string, query string) (string, error) {
 	return string(buf), nil
 }
 
-func CreateOauthTemplate(consumer *Token) (map[string]string) {
+func CreateOauthTemplate(consumer *Token) map[string]string {
 	config := make(map[string]string)
 	config["oauth_consumer_key"] = consumer.Token
 	config["oauth_signature_method"] = "HMAC-SHA1"
@@ -204,4 +204,3 @@ func SaveTokens(filename string, consumer *Token, access *Token, name string) {
 	output += "\nscreen_name:" + name
 	ioutil.WriteFile(filename, []byte(output), os.ModePerm)
 }
-

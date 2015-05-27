@@ -170,7 +170,7 @@ func CreateQuery(config map[string]string) string {
 	return query
 }
 
-func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*Token, error) {
+func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*Token, string, error) {
 
 	param1 := "GET&" + url.QueryEscape(access_token_url) + "&"
 	config["oauth_nonce"] = random(32)
@@ -187,19 +187,21 @@ func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*T
 	query := param2 + "&oauth_signature=" + sig
 	result, err := getToken("GET", access_token_url, query)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	access := new(Token)
 	access.Token = strings.Split(strings.Split(result, "&")[0], "=")[1]
 	access.Secret = strings.Split(strings.Split(result, "&")[1], "=")[1]
-	return access, nil
+	name := strings.Split(strings.Split(result, "&")[3], "=")[1]
+	return access, name, nil
 }
 
-func SaveTokens(filename string, consumer *Token, access *Token) {
+func SaveTokens(filename string, consumer *Token, access *Token, name string) {
 	output := "consumer_key:" + consumer.Token
 	output += "\nconsumer_secret:" + consumer.Secret
 	output += "\naccess_token:" + access.Token
 	output += "\naccess_secret:" + access.Secret
+	output += "\nscreen_name:" + name
 	ioutil.WriteFile(filename, []byte(output), os.ModePerm)
 }
 

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -33,15 +34,16 @@ const (
  * @param filename
  * @return ConsumerKeys and AccessTokens
  */
-func ReadTokens(file string) (*Token, *Token, error) {
+func ReadTokens(file string) (*Token, *Token, string, error) {
 	fp, err := os.Open(file)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	defer fp.Close()
 
 	consumer := new(Token)
 	access := new(Token)
+	var name string
 	scanner := bufio.NewScanner(fp)
 	for scanner.Scan() {
 		key := strings.Split(scanner.Text(), ":")
@@ -56,18 +58,20 @@ func ReadTokens(file string) (*Token, *Token, error) {
 			access.Token = strings.Trim(key[1], " ")
 		} else if strings.Trim(key[0], " ") == "access_secret" {
 			access.Secret = strings.Trim(key[1], " ")
+		} else if strings.Trim(key[0], " ") == "screen_name" {
+			name = strings.Trim(key[1], " ")
 		}
 	}
 	err = scanner.Err()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	if consumer.Token == "" || consumer.Secret == "" {
 		fmt.Fprintln(os.Stderr, "Invalid file format.")
-		return nil, nil, err
+		return nil, nil, "", err
 	}
-	return consumer, access, err
+	return consumer, access, name, err
 }
 
 func random(length int) string {
@@ -90,12 +94,14 @@ func getToken(method string, url string, query string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fmt.Fprintln(os.Stderr, query)
 	req.URL.RawQuery = query
 	req.Header.Add("Authorize", "Oauth")
 	client := new(http.Client)
 	resp, err := client.Do(req)
 	defer resp.Body.Close()
 
+	fmt.Fprintln(os.Stderr, resp.StatusCode)
 	if resp.StatusCode != 200 {
 		return "", err
 	}
@@ -103,16 +109,24 @@ func getToken(method string, url string, query string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fmt.Println(string(buf))
 	return string(buf), nil
 }
 
-func GetRequestToken(consumer *Token) (*Token, error) {
+func CreateOauthTemplate(consumer *Token) (map[string]string) {
+	config := make(map[string]string)
+	config["oauth_consumer_key"] = consumer.Token
+	config["oauth_signature_method"] = "HMAC-SHA1"
+	config["oauth_version"] = "1.0"
+	return config
+}
+
+func GetRequestToken(consumer *Token, config map[string]string) (*Token, error) {
+	config["oauth_nonce"] = random(32)
+	config["oauth_timestamp"] = getTimestamp()
+
 	param1 := "GET&" + url.QueryEscape(request_token_url) + "&"
-	param2 := "oauth_consumer_key=" + consumer.Token + "&"
-	param2 += "oauth_nonce=" + random(32) + "&"
-	param2 += "oauth_signature_method=HMAC-SHA1&"
-	param2 += "oauth_timestamp=" + getTimestamp() + "&"
-	param2 += "oauth_version=1.0"
+	param2 := CreateQuery(config)
 	param3 := url.QueryEscape(consumer.Secret) + "&"
 	param1 += url.QueryEscape(param2)
 
@@ -121,6 +135,7 @@ func GetRequestToken(consumer *Token) (*Token, error) {
 	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(hash.Sum(nil)))
 	query := param2 + "&oauth_signature=" + sig
 	result, err := getToken("GET", request_token_url, query)
+	fmt.Println(config)
 
 	if err != nil {
 		return nil, err
@@ -135,18 +150,35 @@ func GetPinUrl(reqtoken *Token) string {
 	return authorize_url + reqtoken.Token
 }
 
-func GetAccessToken(consumer *Token, reqtoken *Token, pin string) (*Token, error) {
+func CreateQuery(config map[string]string) string {
+	config["oauth_nonce"] = random(32)
+	config["oauth_timestamp"] = getTimestamp()
+	index := make([]string, len(config))
+	n := 0
+	for i := range config {
+		index[n] = i
+		n++
+	}
+	sort.Strings(index)
+	var query string
+	for c := range index {
+		if query != "" {
+			query += "&"
+		}
+		query += index[c] + "=" + config[index[c]]
+	}
+	return query
+}
+
+func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*Token, error) {
 
 	param1 := "GET&" + url.QueryEscape(access_token_url) + "&"
-	param2 := "oauth_consumer_key=" + consumer.Token + "&"
-	param2 += "oauth_nonce=" + random(32) + "&"
-	param2 += "oauth_signature_method=HMAC-SHA1&"
-	param2 += "oauth_timestamp=" + getTimestamp() + "&"
-	param2 += "oauth_token=" + reqtoken.Token + "&"
-	param2 += "oauth_verifier=" + pin + "&"
-	param2 += "oauth_version=1.0"
+	config["oauth_nonce"] = random(32)
+	config["oauth_timestamp"] = getTimestamp()
+	config["oauth_token"] = token.Token
+	param2 := CreateQuery(config)
 	param3 := url.QueryEscape(consumer.Secret) + "&"
-	param3 += url.QueryEscape(reqtoken.Secret)
+	param3 += url.QueryEscape(token.Secret)
 	param1 += url.QueryEscape(param2)
 
 	hash := hmac.New(sha1.New, []byte(param3))

@@ -1,3 +1,7 @@
+/*
+	The twitgoauth package implements a library
+	to authenticate Twitter with Oauth.
+*/
 package twitgoauth
 
 import (
@@ -18,6 +22,13 @@ import (
 	"time"
 )
 
+/*
+	Token stores some token and secret token.
+	This is used to store the following:
+	(consumer key, consumer secret),
+	(request token, request token secret),
+	(access token, access token secret).
+*/
 type Token struct {
 	Token  string
 	Secret string

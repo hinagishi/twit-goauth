@@ -121,6 +121,11 @@ func CreateOauthTemplate(consumer *Token) map[string]string {
 	return config
 }
 
+/*
+ * Get request token and request token secret.
+ * @param consumer key, secret and config
+ * @return request tokens and error
+ */
 func GetRequestToken(consumer *Token, config map[string]string) (*Token, error) {
 	config["oauth_nonce"] = random(32)
 	config["oauth_timestamp"] = getTimestamp()
@@ -146,10 +151,18 @@ func GetRequestToken(consumer *Token, config map[string]string) (*Token, error) 
 	return reqToken, nil
 }
 
+/*
+ * Create URL to get PIN code
+ */
 func GetPinUrl(reqtoken *Token) string {
 	return authorize_url + reqtoken.Token
 }
 
+/*
+ * Create query string
+ * @param config
+ * @return query
+ */
 func CreateQuery(config map[string]string) string {
 	config["oauth_nonce"] = random(32)
 	config["oauth_timestamp"] = getTimestamp()
@@ -170,6 +183,11 @@ func CreateQuery(config map[string]string) string {
 	return query
 }
 
+/*
+ * Get access token and access token secret.
+ * @param consumer keys, request tokens, config
+ * @return access token, secret, screen name and error
+ */
 func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*Token, string, error) {
 
 	param1 := "GET&" + url.QueryEscape(access_token_url) + "&"
@@ -196,6 +214,9 @@ func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*T
 	return access, name, nil
 }
 
+/*
+ * Save tokens to a file.
+ */
 func SaveTokens(filename string, consumer *Token, access *Token, name string) {
 	output := "consumer_key:" + consumer.Token
 	output += "\nconsumer_secret:" + consumer.Secret

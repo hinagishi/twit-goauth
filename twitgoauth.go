@@ -1,6 +1,5 @@
 /*
-	The twitgoauth package implements a library
-	to authenticate Twitter with Oauth.
+Package twitgoauth implements a library for authenticate Twitter with Oauth.
 */
 package twitgoauth
 
@@ -22,29 +21,19 @@ import (
 	"time"
 )
 
-/*
-	Token stores some token and secret token.
-	This is used to store the following:
-	(consumer key, consumer secret),
-	(request token, request token secret),
-	(access token, access token secret).
-*/
+// A Token struct for consumer, request, and access token.
 type Token struct {
 	Token  string
 	Secret string
 }
 
 const (
-	request_token_url = "https://api.twitter.com/oauth/request_token"
-	access_token_url  = "https://api.twitter.com/oauth/access_token"
-	authorize_url     = "http://twitter.com/oauth/authorize?oauth_token="
+	requestTokenURL = "https://api.twitter.com/oauth/request_token"
+	accessTokenURL  = "https://api.twitter.com/oauth/access_token"
+	authorizeURL    = "http://twitter.com/oauth/authorize?oauth_token="
 )
 
-/*
- * read consumer and access tokens from file
- * @param filename
- * @return ConsumerKeys and AccessTokens
- */
+// ReadTokens reads consumer and access tokens from a file.
 func ReadTokens(file string) (*Token, *Token, string, error) {
 	fp, err := os.Open(file)
 	if err != nil {
@@ -89,7 +78,7 @@ func random(length int) string {
 	const base = 36
 	size := big.NewInt(base)
 	n := make([]byte, length)
-	for i, _ := range n {
+	for i := range n {
 		c, _ := rand.Int(rand.Reader, size)
 		n[i] = strconv.FormatInt(c.Int64(), base)[0]
 	}
@@ -124,6 +113,7 @@ func getToken(method string, url string, query string) (string, error) {
 	return string(buf), nil
 }
 
+// CreateOauthTemplate creates a map includes items for oauth.
 func CreateOauthTemplate(consumer *Token) map[string]string {
 	config := make(map[string]string)
 	config["oauth_consumer_key"] = consumer.Token
@@ -132,11 +122,12 @@ func CreateOauthTemplate(consumer *Token) map[string]string {
 	return config
 }
 
+// GetRequestToken retrieves a request token from Twitter API server.
 func GetRequestToken(consumer *Token, config map[string]string) (*Token, error) {
 	config["oauth_nonce"] = random(32)
 	config["oauth_timestamp"] = getTimestamp()
 
-	param1 := "GET&" + url.QueryEscape(request_token_url) + "&"
+	param1 := "GET&" + url.QueryEscape(requestTokenURL) + "&"
 	param2 := CreateQuery(config)
 	param3 := url.QueryEscape(consumer.Secret) + "&"
 	param1 += url.QueryEscape(param2)
@@ -145,7 +136,7 @@ func GetRequestToken(consumer *Token, config map[string]string) (*Token, error) 
 	hash.Write([]byte(param1))
 	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(hash.Sum(nil)))
 	query := param2 + "&oauth_signature=" + sig
-	result, err := getToken("GET", request_token_url, query)
+	result, err := getToken("GET", requestTokenURL, query)
 	fmt.Println(config)
 
 	if err != nil {
@@ -157,10 +148,12 @@ func GetRequestToken(consumer *Token, config map[string]string) (*Token, error) 
 	return reqToken, nil
 }
 
-func GetPinUrl(reqtoken *Token) string {
-	return authorize_url + reqtoken.Token
+// GetPinURL returns a URL to get PIN code.
+func GetPinURL(reqtoken *Token) string {
+	return authorizeURL + reqtoken.Token
 }
 
+// CreateQuery makes a query string
 func CreateQuery(config map[string]string) string {
 	config["oauth_nonce"] = random(32)
 	config["oauth_timestamp"] = getTimestamp()
@@ -181,9 +174,10 @@ func CreateQuery(config map[string]string) string {
 	return query
 }
 
+// GetAccessToken retrieves access token and secret.
 func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*Token, string, error) {
 
-	param1 := "GET&" + url.QueryEscape(access_token_url) + "&"
+	param1 := "GET&" + url.QueryEscape(accessTokenURL) + "&"
 	config["oauth_nonce"] = random(32)
 	config["oauth_timestamp"] = getTimestamp()
 	config["oauth_token"] = token.Token
@@ -196,7 +190,7 @@ func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*T
 	hash.Write([]byte(param1))
 	sig := url.QueryEscape(base64.StdEncoding.EncodeToString(hash.Sum(nil)))
 	query := param2 + "&oauth_signature=" + sig
-	result, err := getToken("GET", access_token_url, query)
+	result, err := getToken("GET", accessTokenURL, query)
 	if err != nil {
 		return nil, "", err
 	}
@@ -207,6 +201,7 @@ func GetAccessToken(consumer *Token, token *Token, config map[string]string) (*T
 	return access, name, nil
 }
 
+// SaveTokens stores consumer keys, access tokens and screen_name to a file.
 func SaveTokens(filename string, consumer *Token, access *Token, name string) {
 	output := "consumer_key:" + consumer.Token
 	output += "\nconsumer_secret:" + consumer.Secret

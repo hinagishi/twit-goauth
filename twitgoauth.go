@@ -153,7 +153,7 @@ func GetPinURL(reqtoken *Token) string {
 	return authorizeURL + reqtoken.Token
 }
 
-// CreateQuery makes a query string
+// CreateQuery makes a query string.
 func CreateQuery(config map[string]string) string {
 	config["oauth_nonce"] = random(32)
 	config["oauth_timestamp"] = getTimestamp()
